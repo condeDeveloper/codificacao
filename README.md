@@ -154,7 +154,7 @@ utf8.inicioDoCaractere(bytes, 3);             // onde começa o caractere daquel
 utf16.cortarSemPartir(texto, 100);            // trunca sem quebrar par substituto
 utf16.quantidadeDeCaracteres(texto);          // o que `.length` deveria ter sido
 
-latin1.decodificar(bytes);                    // Latin-1 puro, que o Node não oferece
+latin1.decodificar(bytes);                    // Latin-1 puro, sempre — não depende da build
 latin1.decodificar(bytes, { windows: true }); // Windows-1252
 ```
 
