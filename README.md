@@ -93,17 +93,25 @@ mensagem, campo com limite e resumo de log:
 cortarSemPartir("😀😀", 1)  // "" — recua para a fronteira
 ```
 
-## O `TextDecoder('latin1')` do Node não é Latin-1
+## Não dá para confiar no `TextDecoder` para codificação legada
 
-Descoberta de um teste que eu escrevi esperando igualdade e que falhou.
+Esta seção foi reescrita duas vezes, e as duas correções vieram de testes.
 
-A especificação da WHATWG define **`iso-8859-1` e `latin1` como apelidos de
-`windows-1252`** — justamente porque tanta página declara Latin-1 e entrega
-Windows-1252 que o comportamento tolerante virou o padrão.
+A primeira: escrevi um teste esperando que `TextDecoder('latin1')` fosse
+Latin-1, e ele falhou. A especificação da WHATWG define **`iso-8859-1` e
+`latin1` como apelidos de `windows-1252`** — porque tanta página declara
+Latin-1 e entrega Windows-1252 que o comportamento tolerante virou o padrão.
 
-Ou seja: **não existe jeito de pedir Latin-1 puro ao `TextDecoder`**. Um sistema
-que precisa dele de verdade — lendo arquivo antigo, protocolo legado — precisa
-fazer à mão.
+A segunda veio do CI: **no Node 20 do runner, `TextDecoder('latin1')` devolve
+Latin-1 puro**, e `TextDecoder('windows-1252')` também. Codificações que não
+são UTF-8 dependem do ICU com que o Node foi compilado, e builds diferentes se
+comportam diferente.
+
+A conclusão é mais forte que a primeira versão: não dá para contar com o
+`TextDecoder` para codificação legada nenhuma — nem para *pedir* Windows-1252,
+nem para *evitá-lo*. Quem precisa de uma das duas de verdade faz à mão, e é o
+que este módulo faz. O teste agora **descobre** o comportamento da build e
+confere contra o modo certo.
 
 A diferença está na faixa `80`–`9F`, que no Latin-1 é de controles invisíveis e
 no Windows-1252 tem as aspas curvas, o travessão, as reticências e o euro. É a
@@ -154,7 +162,7 @@ latin1.decodificar(bytes, { windows: true }); // Windows-1252
 npm test
 ```
 
-55 testes.
+56 testes.
 
 ## Estrutura
 

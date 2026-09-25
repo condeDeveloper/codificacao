@@ -156,23 +156,36 @@ describe('Latin-1', () => {
     assert.deepEqual(decodificarLatin(bytes), [0x00, 0x41, 0x7f, 0x80, 0xe7, 0xff]);
   });
 
-  it('o TextDecoder("latin1") do Node NÃO é Latin-1', () => {
-    // Descoberta deste teste, e ela é da especificação: a WHATWG define
-    // "iso-8859-1" e "latin1" como **apelidos de windows-1252**, justamente
-    // porque tanta página declara Latin-1 e entrega Windows-1252 que o
-    // comportamento tolerante virou o padrão.
+  it('o que o TextDecoder("latin1") devolve depende da build do Node', () => {
+    // Este teste começou afirmando que o `TextDecoder('latin1')` é sempre
+    // Windows-1252 — a WHATWG define "iso-8859-1" e "latin1" como apelidos de
+    // "windows-1252", e é o que o Node 22 e 24 fazem.
     //
-    // Ou seja: não existe jeito de pedir Latin-1 puro ao `TextDecoder`. Um
-    // sistema que precisa dele de verdade — lendo arquivo antigo, protocolo
-    // legado — precisa fazer à mão, que é o que este módulo faz.
+    // O CI desmentiu: **no Node 20 do runner, ele devolve Latin-1 puro.**
+    // As codificações que não são UTF-8 dependem do ICU com que o Node foi
+    // compilado, e builds diferentes se comportam diferente.
+    //
+    // A lição é mais forte que a original: não dá para confiar no
+    // `TextDecoder` para codificação legada nenhuma — nem para pedir
+    // Windows-1252, nem para *evitá-lo*. Quem precisa de uma das duas de
+    // verdade faz à mão, que é o que este módulo faz.
     const doNode = new TextDecoder('latin1');
     const bytes = Uint8Array.from(Array.from({ length: 256 }, (_, i) => i));
+    const saida = doNode.decode(bytes);
 
     const puro = String.fromCodePoint(...decodificarLatin(bytes));
     const comWindows = String.fromCodePoint(...decodificarLatin(bytes, { windows: true }));
 
-    assert.notEqual(puro, doNode.decode(bytes), 'o Node não devolve Latin-1 puro');
-    assert.equal(comWindows, doNode.decode(bytes), 'o que ele devolve é Windows-1252');
+    // Seja qual for a build, a saída tem de ser exatamente uma das duas — e
+    // as duas estão implementadas aqui.
+    assert.ok(
+      saida === puro || saida === comWindows,
+      'a saída do Node não bate com Latin-1 puro nem com Windows-1252',
+    );
+
+    const ehWindows = doNode.decode(Uint8Array.from([0x80])) === '€';
+
+    assert.equal(saida, ehWindows ? comWindows : puro);
   });
 
   it('o Latin-1 puro difere justamente na faixa 80–9F', () => {
@@ -214,8 +227,16 @@ describe('Windows-1252, que é quase Latin-1', () => {
     assert.deepEqual(decodificarLatin(bytes), [0x93, 0x61, 0x94], 'em Latin-1 são controles');
   });
 
-  it('bate com o TextDecoder windows-1252 do Node', () => {
+  it('bate com o TextDecoder windows-1252 do Node, quando ele é windows-1252', () => {
     const decodificador = new TextDecoder('windows-1252');
+
+    // Mesma ressalva do teste acima: em algumas builds do Node este rótulo
+    // decodifica como Latin-1. Quando é o caso, não há o que comparar — a
+    // tabela do Windows-1252 continua conferida byte a byte pelos outros
+    // testes deste arquivo.
+    if (decodificador.decode(Uint8Array.from([0x80])) !== '€') {
+      return;
+    }
 
     for (let byte = 0; byte < 256; byte += 1) {
       if (NAO_ATRIBUIDOS.includes(byte)) continue;
@@ -224,6 +245,27 @@ describe('Windows-1252, que é quase Latin-1', () => {
 
       assert.equal(meu, decodificador.decode(Uint8Array.from([byte])), `byte 0x${byte.toString(16)}`);
     }
+  });
+
+  it('a tabela do Windows-1252 é conferida sem depender do Node', () => {
+    // Os valores vêm da especificação da WHATWG, e são os mesmos que a
+    // Microsoft publica. Este teste é o que garante a tabela onde o
+    // `TextDecoder` não serve de juiz.
+    const esperados = {
+      0x80: '€', 0x82: '‚', 0x83: 'ƒ', 0x84: '„', 0x85: '…', 0x86: '†', 0x87: '‡',
+      0x88: 'ˆ', 0x89: '‰', 0x8a: 'Š', 0x8b: '‹', 0x8c: 'Œ', 0x8e: 'Ž', 0x91: '‘',
+      0x92: '’', 0x93: '“', 0x94: '”', 0x95: '•', 0x96: '–', 0x97: '—', 0x98: '˜',
+      0x99: '™', 0x9a: 'š', 0x9b: '›', 0x9c: 'œ', 0x9e: 'ž', 0x9f: 'Ÿ',
+    };
+
+    for (const [byte, caractere] of Object.entries(esperados)) {
+      const meu = String.fromCodePoint(
+        ...decodificarLatin(Uint8Array.from([Number(byte)]), { windows: true }));
+
+      assert.equal(meu, caractere, `byte 0x${Number(byte).toString(16)}`);
+    }
+
+    assert.equal(Object.keys(esperados).length, 27, 'são 27 bytes que diferem do Latin-1');
   });
 
   it('o euro está no byte 80', () => {
