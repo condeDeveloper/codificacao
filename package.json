@@ -1,0 +1,17 @@
+{
+  "name": "codificacao",
+  "version": "1.0.0",
+  "description": "UTF-8, UTF-16 e Latin-1 escritos do zero em Node puro, com as sequências inválidas que já viraram falha de segurança.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": "./src/index.js",
+  "bin": { "codificacao": "src/cli.js" },
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "test": "node --test testes/*.test.js",
+    "codificacao": "node src/cli.js"
+  },
+  "keywords": ["utf-8", "utf-16", "unicode", "codificacao", "seguranca"],
+  "license": "MIT",
+  "private": false
+}
